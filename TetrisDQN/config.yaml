@@ -1,0 +1,58 @@
+# =============================================================================
+# config.yaml – DQN Tetris Agent Configuration
+# =============================================================================
+# All hyperparameters, environment settings, file paths, and execution modes
+# are defined here.  No magic numbers should appear in Python source files.
+# Phase 3 will extend this file with a 'dueling_agent' section.
+# =============================================================================
+
+# ---- Reproducibility --------------------------------------------------------
+seed: 42
+
+# ---- Compute device ---------------------------------------------------------
+# Options: "auto"  (selects CUDA > MPS > CPU automatically)
+#          "cpu"   (force CPU)
+#          "cuda"  (force NVIDIA GPU)
+#          "mps"   (force Apple Silicon GPU)
+device: "auto"
+
+# ---- Rendering (used during evaluation only) --------------------------------
+# Options: null (headless), "human" (live window), "rgb_array"
+render_mode: null
+
+# ---- Training duration ------------------------------------------------------
+num_episodes: 5000       # Total training episodes
+log_interval: 100        # Print rolling average every N episodes
+save_interval: 500       # Save checkpoint every N episodes
+
+# ---- Output -----------------------------------------------------------------
+results_dir: "dqn_results"   # Directory for checkpoints, plots, history
+
+# ---- Environment settings ---------------------------------------------------
+env:
+  rows: 20    # Board height (standard Tetris)
+  cols: 10    # Board width  (standard Tetris)
+
+# ---- DQN Agent hyperparameters ----------------------------------------------
+agent:
+
+  # Optimiser
+  learning_rate: 0.0001        # Adam learning rate
+
+  # Temporal-difference learning
+  gamma: 0.99                  # Discount factor (high: prioritise long runs)
+
+  # Neural network architecture (MLP hidden layer widths)
+  hidden_sizes: [512, 256, 128]
+
+  # Epsilon-greedy exploration schedule (linear decay)
+  epsilon_start: 1.0           # Start fully random
+  epsilon_end:   0.05          # Minimum exploration rate
+  epsilon_decay_steps: 100000  # Steps over which epsilon decays linearly
+
+  # Experience replay buffer
+  buffer_capacity: 100000      # Maximum stored transitions
+  batch_size: 64               # Mini-batch size for gradient updates
+
+  # Target network synchronisation
+  target_update_freq: 1000     # Gradient steps between hard target updates
