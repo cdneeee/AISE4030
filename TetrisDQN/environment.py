@@ -142,6 +142,7 @@ class TetrisEnv(gym.Env):
         self.score:            int        = 0
         self.lines_cleared:    int        = 0
         self.steps:            int        = 0
+        self.pieces_placed:    int        = 0
 
         # Pygame handles (lazy-initialised on first render call)
         self._screen = None
@@ -174,6 +175,7 @@ class TetrisEnv(gym.Env):
         self.score         = 0
         self.lines_cleared = 0
         self.steps         = 0
+        self.pieces_placed = 0
 
         # Draw first preview piece, then spawn the active piece
         self.next_piece = int(self.np_random.integers(0, self.NUM_PIECES))
@@ -249,15 +251,19 @@ class TetrisEnv(gym.Env):
 
     def render(self):
         """
-        Render the current board state via Pygame.
+        Render the current board state via Pygame with a stats sidebar.
 
-        In 'human' mode: opens a window and displays the board live.
+        Draws the board, the active piece, grid lines, and a right-hand
+        sidebar showing score, lines cleared, pieces placed, next-piece
+        preview, current piece info, and board quality metrics (holes,
+        aggregate height).
+
+        In 'human' mode: updates the display window in-place.
         In 'rgb_array' mode: returns an (H, W, 3) uint8 pixel array.
 
         Returns:
             np.ndarray or None:
-                RGB pixel array of shape (ROWS*cell_size, COLS*cell_size, 3)
-                when render_mode is 'rgb_array'; None otherwise.
+                RGB pixel array when render_mode is 'rgb_array'; None otherwise.
 
         Raises:
             ImportError: If pygame is not installed.
@@ -270,43 +276,176 @@ class TetrisEnv(gym.Env):
         except ImportError:
             raise ImportError("Install pygame to use render(): pip install pygame")
 
-        cell_size = 30
-        width  = self.COLS * cell_size
-        height = self.ROWS * cell_size
+        # ---- Layout constants ----------------------------------------- #
+        CELL      = 32          # board cell size in pixels
+        SIDEBAR_W = 200         # stats panel width
+        BOARD_W   = self.COLS * CELL
+        BOARD_H   = self.ROWS * CELL
+        WIN_W     = BOARD_W + SIDEBAR_W
+        WIN_H     = BOARD_H
 
+        # ---- Colour palette ------------------------------------------- #
+        C_BG         = (15,  15,  25)
+        C_BOARD_BG   = (20,  20,  35)
+        C_GRID       = (35,  35,  55)
+        C_LOCKED     = (70,  110, 200)
+        C_LOCKED_HI  = (120, 160, 255)   # highlight edge
+        C_ACTIVE     = (230, 200,  50)
+        C_ACTIVE_HI  = (255, 240, 120)
+        C_SIDEBAR_BG = (22,  22,  38)
+        C_DIVIDER    = (50,  50,  75)
+        C_ACCENT     = (100, 180, 255)
+        C_TEXT       = (220, 220, 220)
+        C_LABEL      = (140, 140, 175)
+        C_WARN       = (255, 110, 110)
+
+        # ---- First-time initialisation --------------------------------- #
         if self._screen is None:
             pygame.init()
+            pygame.font.init()
             if self.render_mode == "human":
-                self._screen = pygame.display.set_mode((width, height))
+                self._screen = pygame.display.set_mode((WIN_W, WIN_H))
                 pygame.display.set_caption("Tetris RL Agent")
             else:
-                self._screen = pygame.Surface((width, height))
+                self._screen = pygame.Surface((WIN_W, WIN_H))
             self._clock = pygame.time.Clock()
+            # Fonts (lazy – stored so we don't re-create every frame)
+            self._font_title = pygame.font.SysFont("Consolas", 20, bold=True)
+            self._font_val   = pygame.font.SysFont("Consolas", 22, bold=True)
+            self._font_label = pygame.font.SysFont("Consolas", 12)
+            self._font_piece = pygame.font.SysFont("Consolas", 15)
 
-        self._screen.fill((10, 10, 10))
+        # ---- Clear ---------------------------------------------------- #
+        self._screen.fill(C_BG)
 
-        # Draw locked board cells
+        # ================================================================ #
+        #  Board panel                                                      #
+        # ================================================================ #
+        pygame.draw.rect(self._screen, C_BOARD_BG, (0, 0, BOARD_W, BOARD_H))
+
+        # Grid lines
+        for r in range(self.ROWS + 1):
+            pygame.draw.line(self._screen, C_GRID, (0, r * CELL), (BOARD_W, r * CELL))
+        for c in range(self.COLS + 1):
+            pygame.draw.line(self._screen, C_GRID, (c * CELL, 0), (c * CELL, BOARD_H))
+
+        # Locked cells
         for r in range(self.ROWS):
             for c in range(self.COLS):
                 if self.board[r, c]:
-                    rect = pygame.Rect(
-                        c * cell_size, r * cell_size,
-                        cell_size - 1, cell_size - 1
-                    )
-                    pygame.draw.rect(self._screen, (80, 120, 200), rect)
+                    rect = pygame.Rect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2)
+                    pygame.draw.rect(self._screen, C_LOCKED, rect)
+                    pygame.draw.line(self._screen, C_LOCKED_HI,
+                                     rect.topleft, rect.topright, 2)
+                    pygame.draw.line(self._screen, C_LOCKED_HI,
+                                     rect.topleft, rect.bottomleft, 2)
 
-        # Draw the active (falling) piece in a different colour
-        for r, c in self._get_cells(
-            self.current_piece, self.current_rotation,
-            self.current_row, self.current_col
-        ):
+        # Ghost piece (shows where piece will land)
+        ghost_row = self.current_row
+        while self._is_valid(self.current_piece, self.current_rotation,
+                             ghost_row + 1, self.current_col):
+            ghost_row += 1
+        for r, c in self._get_cells(self.current_piece, self.current_rotation,
+                                     ghost_row, self.current_col):
             if 0 <= r < self.ROWS and 0 <= c < self.COLS:
-                rect = pygame.Rect(
-                    c * cell_size, r * cell_size,
-                    cell_size - 1, cell_size - 1
-                )
-                pygame.draw.rect(self._screen, (220, 200, 50), rect)
+                rect = pygame.Rect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2)
+                pygame.draw.rect(self._screen, (60, 60, 90), rect)
 
+        # Active piece
+        for r, c in self._get_cells(self.current_piece, self.current_rotation,
+                                     self.current_row, self.current_col):
+            if 0 <= r < self.ROWS and 0 <= c < self.COLS:
+                rect = pygame.Rect(c * CELL + 1, r * CELL + 1, CELL - 2, CELL - 2)
+                pygame.draw.rect(self._screen, C_ACTIVE, rect)
+                pygame.draw.line(self._screen, C_ACTIVE_HI,
+                                 rect.topleft, rect.topright, 2)
+                pygame.draw.line(self._screen, C_ACTIVE_HI,
+                                 rect.topleft, rect.bottomleft, 2)
+
+        # Border between board and sidebar
+        pygame.draw.line(self._screen, C_ACCENT, (BOARD_W, 0), (BOARD_W, BOARD_H), 2)
+
+        # ================================================================ #
+        #  Sidebar                                                          #
+        # ================================================================ #
+        pygame.draw.rect(self._screen, C_SIDEBAR_BG,
+                         (BOARD_W, 0, SIDEBAR_W, WIN_H))
+
+        sx = BOARD_W + 12   # left edge of sidebar content
+        sy = 14             # current y cursor
+
+        def draw_label(text, y):
+            surf = self._font_label.render(text, True, C_LABEL)
+            self._screen.blit(surf, (sx, y))
+            return y + 15
+
+        def draw_value(text, y, color=C_TEXT):
+            surf = self._font_val.render(text, True, color)
+            self._screen.blit(surf, (sx, y))
+            return y + 28
+
+        def draw_divider(y):
+            pygame.draw.line(self._screen, C_DIVIDER,
+                             (sx, y), (BOARD_W + SIDEBAR_W - 12, y), 1)
+            return y + 10
+
+        # Title
+        title = self._font_title.render("TETRIS  RL", True, C_ACCENT)
+        self._screen.blit(title, (sx, sy))
+        sy += 28
+        sy = draw_divider(sy)
+
+        # Score
+        sy = draw_label("SCORE", sy)
+        sy = draw_value(str(self.score), sy)
+
+        # Lines cleared
+        sy = draw_label("LINES CLEARED", sy)
+        sy = draw_value(str(self.lines_cleared), sy)
+
+        # Pieces placed
+        sy = draw_label("PIECES PLACED", sy)
+        sy = draw_value(str(self.pieces_placed), sy)
+
+        sy = draw_divider(sy)
+
+        # Next piece preview
+        sy = draw_label("NEXT PIECE", sy)
+        PCELL = 18
+        shape = self._get_shape(self.next_piece, 0)
+        preview_w = shape.shape[1] * PCELL
+        px = sx + (SIDEBAR_W - 24 - preview_w) // 2
+        for r in range(shape.shape[0]):
+            for c in range(shape.shape[1]):
+                if shape[r, c]:
+                    rect = pygame.Rect(px + c * PCELL, sy + r * PCELL,
+                                       PCELL - 2, PCELL - 2)
+                    pygame.draw.rect(self._screen, C_ACTIVE, rect)
+        sy += shape.shape[0] * PCELL + 12
+
+        sy = draw_divider(sy)
+
+        # Current piece
+        sy = draw_label("CURRENT PIECE", sy)
+        rot_str = ["0°", "90°", "180°", "270°"][self.current_rotation]
+        pname = PIECE_NAMES[self.current_piece]
+        sy = draw_value(f"{pname}  {rot_str}", sy)
+
+        sy = draw_divider(sy)
+
+        # Board quality metrics
+        holes  = self._count_holes()
+        height = self._aggregate_height()
+
+        sy = draw_label("HOLES", sy)
+        hole_color = C_WARN if holes > 8 else C_TEXT
+        sy = draw_value(str(holes), sy, hole_color)
+
+        sy = draw_label("AGG. HEIGHT", sy)
+        h_color = C_WARN if height > 80 else C_TEXT
+        sy = draw_value(str(height), sy, h_color)
+
+        # ---- Flip / return -------------------------------------------- #
         if self.render_mode == "human":
             pygame.display.flip()
             self._clock.tick(self.metadata["render_fps"])
@@ -494,6 +633,7 @@ class TetrisEnv(gym.Env):
             float: Reward contribution from this placement event.
         """
         self._lock_piece()
+        self.pieces_placed += 1
         n_lines = self._clear_lines()
         self.lines_cleared += n_lines
         score_gain = LINE_CLEAR_SCORES[n_lines]

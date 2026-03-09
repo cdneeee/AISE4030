@@ -18,7 +18,7 @@ device: "auto"
 
 # ---- Rendering (used during evaluation only) --------------------------------
 # Options: null (headless), "human" (live window), "rgb_array"
-render_mode: null
+render_mode: "human"
 
 # ---- Training duration ------------------------------------------------------
 num_episodes: 5000       # Total training episodes
