@@ -8,13 +8,16 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# Model checkpoints and results (large files)
+# Model checkpoints (large files)
 dqn_results/*.pt
 dueling_dqn_results/*.pt
 
 # Keep the results directories themselves
 !dqn_results/.gitkeep
 !dueling_dqn_results/.gitkeep
+
+# Comparison plots (generated)
+comparison_plots/
 
 # Jupyter notebooks checkpoints
 .ipynb_checkpoints/

@@ -185,7 +185,7 @@ class MetricsLogger:
 #  Plotting                                                                    #
 # --------------------------------------------------------------------------- #
 
-def save_plot(history: dict, results_dir: str):
+def save_plot(history: dict, results_dir: str, title: str = "DQN Tetris – Training Curves"):
     """
     Generate and save training curve plots to the results directory.
 
@@ -202,6 +202,7 @@ def save_plot(history: dict, results_dir: str):
     Args:
         history (dict): Training history from MetricsLogger.history.
         results_dir (str): Directory where the PNG and JSON are saved.
+        title (str): Title for the figure (default: 'DQN Tetris – Training Curves').
     """
     try:
         import matplotlib.pyplot as plt
@@ -238,13 +239,13 @@ def save_plot(history: dict, results_dir: str):
         ax.grid(True, alpha=0.3)
 
     axes[-1].set_xlabel("Episode")
-    fig.suptitle("DQN Tetris – Training Curves", fontsize=14, fontweight="bold")
+    fig.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout()
 
     plot_path = os.path.join(results_dir, "training_curves.png")
     plt.savefig(plot_path, dpi=150)
     plt.close()
-    print(f"  → Plot saved:    {plot_path}")
+    print(f"  -> Plot saved:    {plot_path}")
 
     # Persist raw history
     hist_path = os.path.join(results_dir, "training_history.json")
@@ -254,4 +255,4 @@ def save_plot(history: dict, results_dir: str):
             f,
             indent=2,
         )
-    print(f"  → History saved: {hist_path}")
+    print(f"  -> History saved: {hist_path}")

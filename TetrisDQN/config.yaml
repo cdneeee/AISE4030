@@ -1,9 +1,8 @@
 # =============================================================================
-# config.yaml – DQN Tetris Agent Configuration
+# config.yaml – Tetris RL Agent Configuration (Phase 3)
 # =============================================================================
 # All hyperparameters, environment settings, file paths, and execution modes
 # are defined here.  No magic numbers should appear in Python source files.
-# Phase 3 will extend this file with a 'dueling_agent' section.
 # =============================================================================
 
 # ---- Reproducibility --------------------------------------------------------
@@ -18,24 +17,27 @@ device: "auto"
 
 # ---- Rendering (used during evaluation only) --------------------------------
 # Options: null (headless), "human" (live window), "rgb_array"
-render_mode: "human"
+render_mode: null
 
 # ---- Training duration ------------------------------------------------------
 num_episodes: 5000       # Total training episodes
 log_interval: 100        # Print rolling average every N episodes
 save_interval: 500       # Save checkpoint every N episodes
 
-# ---- Output -----------------------------------------------------------------
-results_dir: "dqn_results"   # Directory for checkpoints, plots, history
+# ---- Evaluation -------------------------------------------------------------
+eval_episodes: 50        # Number of evaluation episodes (exploration disabled)
 
 # ---- Environment settings ---------------------------------------------------
 env:
   rows: 20    # Board height (standard Tetris)
   cols: 10    # Board width  (standard Tetris)
 
-# ---- DQN Agent hyperparameters ----------------------------------------------
-agent:
+# ---- Output directories -----------------------------------------------------
+dqn_results_dir: "dqn_results"
+dueling_results_dir: "dueling_dqn_results"
 
+# ---- DQN Agent hyperparameters (Base Algorithm) -----------------------------
+agent:
   # Optimiser
   learning_rate: 0.0001        # Adam learning rate
 
@@ -56,3 +58,30 @@ agent:
 
   # Target network synchronisation
   target_update_freq: 1000     # Gradient steps between hard target updates
+
+# ---- Dueling DQN Agent hyperparameters (Advanced Algorithm) -----------------
+dueling_agent:
+  # Optimiser
+  learning_rate: 0.0001        # Adam learning rate (same as base for fair comparison)
+
+  # Temporal-difference learning
+  gamma: 0.99                  # Discount factor
+
+  # Shared feature layers (before the V/A split)
+  hidden_sizes: [512, 256]
+
+  # Dueling stream hidden widths
+  value_hidden: 128            # Value stream hidden layer width
+  advantage_hidden: 128        # Advantage stream hidden layer width
+
+  # Epsilon-greedy exploration schedule (linear decay)
+  epsilon_start: 1.0
+  epsilon_end:   0.05
+  epsilon_decay_steps: 100000
+
+  # Experience replay buffer
+  buffer_capacity: 100000
+  batch_size: 64
+
+  # Target network synchronisation
+  target_update_freq: 1000

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AISE 4030 – Phase 2 Progress Report</title>
+<style>
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 11pt;
+    margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+    color: #000;
+    line-height: 1.5;
+  }
+  h1 { font-size: 14pt; text-align: center; margin-bottom: 4px; }
+  h2 { font-size: 12pt; margin-top: 18px; margin-bottom: 4px; border-bottom: 1px solid #000; padding-bottom: 2px; }
+  h3 { font-size: 11pt; margin-top: 12px; margin-bottom: 2px; }
+  .center { text-align: center; }
+  .meta { text-align: center; font-size: 10pt; margin-bottom: 16px; }
+  pre {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 8.5pt;
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    margin: 6px 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10pt;
+    margin: 8px 0;
+  }
+  th, td {
+    border: 1px solid #999;
+    padding: 4px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: #e8e8e8; font-weight: bold; }
+  ul, ol { margin: 4px 0 4px 20px; padding: 0; }
+  li { margin-bottom: 2px; }
+  p { margin: 6px 0; }
+  .section-note { font-style: italic; font-size: 10pt; color: #444; }
+  @media print {
+    body { margin: 1.8cm; }
+    pre { font-size: 8pt; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<h1>AISE 4030 – Reinforcement Learning</h1>
+<h1>RL Project – Phase 2 Progress Report</h1>
+<div class="meta">
+  <strong>Due Date:</strong> March 8, 2026 &nbsp;|&nbsp;
+  <strong>Team Members:</strong>
+  James Keane (251239268) &nbsp;·&nbsp;
+  Hunter Korble (251200643) &nbsp;·&nbsp;
+  Aidan Mitchell (251222232) &nbsp;·&nbsp;
+  Andrii Prykhodko (251330234)
+</div>
+
+<!-- ===== SECTION 1 ===== -->
+<h2>1. Environment Confirmation</h2>
+
+<p>
+  The custom Tetris environment has been successfully implemented and confirmed running on the local machine.
+  The environment is built from scratch as a <strong>Gymnasium-compatible</strong> Python class
+  (<code>TetrisEnv</code> in <code>environment.py</code>), following the standard
+  <code>gym.Env</code> interface with <code>reset()</code>, <code>step()</code>, and <code>render()</code> methods.
+  All required dependencies (<code>gymnasium</code>, <code>torch</code>, <code>numpy</code>,
+  <code>pyyaml</code>, <code>matplotlib</code>, <code>pygame</code>) were installed into a dedicated
+  virtual environment (<code>.venv/</code>) and verified working.
+</p>
+
+<!-- ===== SECTION 2 ===== -->
+<h2>2. Console Output – Training Script API Confirmation</h2>
+
+<p class="section-note">
+  The following output was produced by running <code>python training_script.py</code> on the local machine.
+  It confirms the observation space, action space, device, and a successful environment step.
+</p>
+
+<pre>
+==============================================================
+  TETRIS RL ENVIRONMENT – API CONFIRMATION (Phase 2, Task 1)
+==============================================================
+
+[Observation Space]
+  Type       : Box
+  Shape      : (220,)  (220 features)
+  Dtype      : float32
+  Low        : 0.0000  (all dimensions)
+  High       : 1.0000  (all dimensions)
+  Breakdown  :
+    Board occupancy (20x10, binary) : 200 values
+    Current piece  (one-hot, 7)     :   7 values
+    Orientation    (one-hot, 4)     :   4 values
+    Column position (normalised)    :   1 value
+    Row position    (normalised)    :   1 value
+    Next piece     (one-hot, 7)     :   7 values
+    -----------------------------------------
+    Total                           : 220 float32 in [0, 1]
+
+[Action Space]
+  Type       : Discrete  (discrete, finite)
+  N          : 6 actions
+  Actions    :
+    0: LEFT    – move piece one column left
+    1: RIGHT   – move piece one column right
+    2: ROT_CW  – rotate 90 degrees clockwise
+    3: ROT_CCW – rotate 90 degrees counter-clockwise
+    4: DROP    – hard-drop to lowest valid row
+    5: NO_OP   – no action (gravity only)
+
+[Compute Device]
+  Torch device : cpu
+  Backend      : CPU (no GPU acceleration)
+
+[Environment Step Verification]
+  env.reset()  → obs shape=(220,), dtype=float32  ✔
+  env.step(2)   → obs shape=(220,)
+               reward=-0.0100  terminated=False  truncated=False
+               score=0  lines_cleared=0  steps=1  ✔
+
+  ✔ Environment installed, API confirmed, step successful.
+==============================================================
+</pre>
+
+<!-- ===== SECTION 3 ===== -->
+<h2>3. Comparison with Phase 1 Proposal</h2>
+
+<h3>Observation Space</h3>
+<p>
+  The confirmed observation space (<strong>Box, float32, shape (220,)</strong>) is consistent
+  with the Phase 1 proposal. Phase 1 defined the state as
+  <em>s<sub>t</sub> = (B, p<sub>t</sub>, o<sub>t</sub>, x<sub>t</sub>, y<sub>t</sub>, p<sub>t+1</sub>)</em>,
+  where <em>B</em> is the binary 20×10 board, <em>p<sub>t</sub></em> is the current piece type,
+  <em>o<sub>t</sub></em> is its orientation, (<em>x<sub>t</sub>, y<sub>t</sub></em>) is its bounding-box
+  position, and <em>p<sub>t+1</sub></em> is the next-piece preview.
+  Our implementation encodes this as 200 board values, plus 7-dimensional one-hot vectors for
+  each piece, a 4-dimensional one-hot for orientation, and two normalised scalars for position —
+  totalling 220 features, all in [0, 1]. This directly reflects the proposed formulation.
+</p>
+
+<h3>Action Space</h3>
+<p>
+  The confirmed action space (<strong>Discrete(6)</strong>) matches the Phase 1 proposal exactly.
+  Phase 1 listed: move left, move right, rotate clockwise, rotate counter-clockwise, drop downwards,
+  and no action — all six are present in the implementation.
+</p>
+
+<h3>Potential Challenges</h3>
+<ul>
+  <li>
+    <strong>Sparse rewards early in training:</strong> Line clears are rare for an untrained agent,
+    so the agent will primarily experience the −0.01 step penalty and occasional board-quality
+    penalties. Epsilon-greedy exploration and the high discount factor (γ = 0.99) should
+    help the agent eventually discover line-clearing behaviour.
+  </li>
+  <li>
+    <strong>Training speed:</strong> A single episode can run thousands of steps.
+    With 5 000 training episodes and a CPU-only device, total training time may be substantial.
+    We plan to profile early runs and may reduce episode count or add hard-drop bias during
+    exploration if needed.
+  </li>
+  <li>
+    <strong>Reward shaping balance:</strong> The relative weights for hole and height penalties
+    (−0.5 and −0.3 respectively) were chosen heuristically. Tuning these in Phase 3
+    may be required if the agent learns to minimise penalties at the expense of scoring.
+  </li>
+</ul>
+
+<!-- ===== SECTION 4 ===== -->
+<h2>4. Implementation Approach</h2>
+
+<p>
+  We are implementing the DQN algorithm <strong>from scratch</strong> using
+  <strong>PyTorch</strong>, without relying on a high-level RL library such as Stable Baselines3
+  or RLlib. This decision is justified by two reasons:
+</p>
+<ol>
+  <li>
+    <strong>Full control for comparison:</strong> Our Phase 3 advanced algorithm is a
+    <em>Dueling DQN</em>, which differs from the baseline only in network architecture
+    (splitting the final layers into a Value stream V(s) and an Advantage stream A(s,a)).
+    Implementing both from scratch ensures that any performance difference is attributable
+    solely to the architectural change, not to library-level differences in replay sampling,
+    target updates, or optimisers.
+  </li>
+  <li>
+    <strong>Custom environment:</strong> Since we built a custom Tetris environment
+    rather than using a pre-packaged one, the environment itself is already hand-crafted.
+    Implementing the agent from scratch maintains consistency and gives us complete
+    visibility into every component of the system.
+  </li>
+</ol>
+
+<p>
+  The DQN baseline uses a Multi-Layer Perceptron (512 → 256 → 128 → 6) with an experience
+  replay buffer (capacity 100 000), a target network synced every 1 000 gradient steps,
+  and linear epsilon decay from 1.0 to 0.05 over 100 000 steps. All hyperparameters are
+  centralised in <code>config.yaml</code>.
+</p>
+
+<!-- ===== SECTION 5 ===== -->
+<h2>5. Team Contribution Efforts</h2>
+
+<table>
+  <tr><th>Member</th><th>Contributions – Phase 2</th></tr>
+  <tr>
+    <td><strong>James Keane</strong><br>251239268</td>
+    <td>
+      <ul>
+        <li>Led design and implementation of <code>environment.py</code> (TetrisEnv class, tetromino logic, reward function)</li>
+        <li>Verified game mechanics (collision detection, line clearing, spawn logic)</li>
+        <li>Wrote environment section of the progress report</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Hunter Korble</strong><br>251200643</td>
+    <td>
+      <ul>
+        <li>Implemented <code>dqn_agent.py</code> (DQNAgent class, choose_action, learn, save/load)</li>
+        <li>Implemented <code>q_network.py</code> (QNetwork MLP architecture)</li>
+        <li>Verified end-to-end agent training loop functionality</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Aidan Mitchell</strong><br>251222232</td>
+    <td>
+      <ul>
+        <li>Implemented <code>replay_buffer.py</code> (ReplayBuffer circular buffer)</li>
+        <li>Implemented <code>training_script.py</code> (training loop, evaluation function, API printout)</li>
+        <li>Wrote implementation approach section of the progress report</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Andrii Prykhodko</strong><br>251330234</td>
+    <td>
+      <ul>
+        <li>Implemented <code>utils.py</code> (config loading, device selection, MetricsLogger, plotting)</li>
+        <li>Set up <code>config.yaml</code>, <code>requirements.txt</code>, virtual environment, and <code>README.md</code></li>
+        <li>Assembled and edited the final progress report and AI usage log</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+<!-- ===== APPENDIX ===== -->
+<h2>Appendix – AI Usage Log</h2>
+
+<p>
+  In accordance with the AISE 4030 AI Usage Policy, the following documents all AI tool usage
+  during Phase 2.
+</p>
+
+<table>
+  <tr>
+    <th>Tool</th>
+    <th>Version</th>
+    <th>Purpose</th>
+  </tr>
+  <tr>
+    <td>Claude Code (Claude Sonnet)</td>
+    <td>claude-sonnet-4-6</td>
+    <td>
+      Used to generate the initial code skeleton for all project files, verify compliance
+      with Phase 2 requirements, and assist with debugging environment logic.
+    </td>
+  </tr>
+</table>
+
+<h3>Full Prompt Log</h3>
+
+<table>
+  <tr><th>#</th><th>Prompt (submitted to Claude)</th><th>Output used?</th><th>Changes made</th></tr>
+  <tr>
+    <td>1</td>
+    <td>
+      "So I am trying to create an environment for my tetris playing agent. Phase 1 pdf contains
+      details about our model and what we need to implement and phase 2 is what actually needs to
+      be completed. Follow instructions in phase 2 document and create an environment."
+    </td>
+    <td>Yes – used as starting point</td>
+    <td>
+      Reviewed all generated files. Confirmed tetromino rotation logic, reward weights,
+      and observation encoding were consistent with Phase 1 proposal.
+      Minor docstring wording adjusted for clarity.
+    </td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>"Continue and create gitignore"</td>
+    <td>Yes – used as-is</td>
+    <td>None; .gitignore content was appropriate for the project structure.</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>"Double check and verify it follows phase 2 requirements"</td>
+    <td>Yes – review findings used</td>
+    <td>
+      Used the compliance report to confirm all 25 requirements were satisfied
+      before finalising submission.
+    </td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>"So if you read phase 2 we need to create a document and describe everything there"</td>
+    <td>Yes – this report</td>
+    <td>
+      Team reviewed report content and updated team contribution entries to
+      accurately reflect each member's actual work.
+    </td>
+  </tr>
+</table>
+
+<p>
+  All team members reviewed every file generated or assisted by AI and are able to explain
+  any part of the implementation. Code was not used blindly; each module was read, tested,
+  and understood before inclusion in the submission.
+</p>
+
+</body>
+</html>

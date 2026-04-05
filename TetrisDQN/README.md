@@ -1,9 +1,8 @@
-# Tetris DQN – AISE 4030 Reinforcement Learning Project
+# Tetris DQN – AISE 4030 Reinforcement Learning Project (Phase 3)
 
-A Deep Q-Network (DQN) agent trained on a custom Tetris environment built
-with the Gymnasium API.  Phase 2 delivers the environment implementation and
-the DQN agent skeleton; Phase 3 will complete the training logic and add the
-Dueling DQN advanced algorithm for comparison.
+A Deep Q-Network (DQN) and Dueling DQN agent trained on a custom Tetris
+environment built with the Gymnasium API.  Phase 3 delivers complete
+implementations of both algorithms, training runs, and comparative analysis.
 
 ---
 
@@ -11,22 +10,21 @@ Dueling DQN advanced algorithm for comparison.
 
 ```
 TetrisDQN/
-├── config.yaml            # All hyperparameters and settings (no magic numbers in code)
-├── environment.py         # Custom Tetris Gymnasium environment (TetrisEnv)
-├── q_network.py           # MLP Q-network architecture (QNetwork)
-├── replay_buffer.py       # Circular experience replay buffer (ReplayBuffer)
-├── dqn_agent.py           # DQN agent – action selection, learning, save/load (DQNAgent)
-├── training_script.py     # Main entry point: train, evaluate, env API confirmation
-├── utils.py               # Config loading, device selection, logging, plotting
-├── requirements.txt       # Python dependencies
-├── README.md              # This file
-└── dqn_results/           # Output: checkpoints, training curves, history JSON
-```
-
-**Phase 3 additions** (not yet present):
-```
-dueling_dqn_agent.py       # Dueling DQN — overrides QNetwork with V/A streams
-dueling_dqn_results/       # Results for the advanced algorithm
+├── config.yaml              # All hyperparameters and settings (no magic numbers in code)
+├── environment.py           # Custom Tetris Gymnasium environment (TetrisEnv)
+├── q_network.py             # MLP Q-network architecture (QNetwork)
+├── dueling_q_network.py     # Dueling Q-network with Value/Advantage streams
+├── replay_buffer.py         # Circular experience replay buffer (ReplayBuffer)
+├── dqn_agent.py             # DQN agent – action selection, learning, save/load
+├── dueling_dqn_agent.py     # Dueling DQN agent – inherits DQNAgent, overrides network
+├── training_script.py       # Main entry point: train, evaluate both agents
+├── compare.py               # Comparative analysis: generates all comparison plots
+├── utils.py                 # Config loading, device selection, logging, plotting
+├── requirements.txt         # Python dependencies
+├── README.md                # This file
+├── dqn_results/             # Output: DQN checkpoints, training curves, history JSON
+├── dueling_dqn_results/     # Output: Dueling DQN checkpoints, curves, history JSON
+└── comparison_plots/        # Output: side-by-side comparison figures
 ```
 
 ---
@@ -36,9 +34,9 @@ dueling_dqn_results/       # Results for the advanced algorithm
 ### 1. Create a virtual environment (recommended)
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # Linux / macOS
-venv\Scripts\activate           # Windows
+python -m venv .venv
+source .venv/bin/activate        # Linux / macOS
+.venv\Scripts\activate           # Windows
 ```
 
 ### 2. Install dependencies
@@ -47,30 +45,50 @@ venv\Scripts\activate           # Windows
 pip install -r requirements.txt
 ```
 
-### 3. Verify the environment
-
-```bash
-cd TetrisDQN
-python training_script.py       # prints API info then begins training
-```
-
 ---
 
 ## Running
 
-### Train from scratch
+### Train DQN (base algorithm)
 
 ```bash
-python training_script.py
-python training_script.py --config config.yaml   # explicit config path
+python training_script.py --agent dqn
 ```
 
-### Evaluate a saved model
+### Train Dueling DQN (advanced algorithm)
 
 ```bash
-python training_script.py --eval --model dqn_results/dqn_final.pt
-python training_script.py --eval --eval-episodes 20
+python training_script.py --agent dueling
 ```
+
+### Evaluate a trained model
+
+```bash
+# Evaluates over 50 episodes (default) with exploration disabled
+python training_script.py --eval --agent dqn
+python training_script.py --eval --agent dueling
+
+# Specify checkpoint and episode count
+python training_script.py --eval --agent dqn --model dqn_results/dqn_final.pt --eval-episodes 100
+```
+
+### Generate comparison plots
+
+```bash
+# After both agents have been trained:
+python compare.py
+```
+
+---
+
+## Reproducibility
+
+All hyperparameters are in `config.yaml`.  To reproduce results:
+
+1. Use Python 3.10+ with the pinned `requirements.txt`.
+2. Set `seed: 42` (default) in `config.yaml`.
+3. Run `python training_script.py --agent dqn` followed by `--agent dueling`.
+4. Run `python compare.py` for all comparison figures.
 
 ---
 
@@ -78,19 +96,22 @@ python training_script.py --eval --eval-episodes 20
 
 All settings live in `config.yaml`.  Key parameters:
 
-| Parameter | Default | Description |
-|---|---|---|
-| `seed` | 42 | Global random seed |
-| `device` | `"auto"` | Compute device: auto / cpu / cuda / mps |
-| `num_episodes` | 5000 | Training episode count |
-| `agent.gamma` | 0.99 | Discount factor |
-| `agent.learning_rate` | 0.0001 | Adam LR |
-| `agent.epsilon_start` | 1.0 | Initial exploration rate |
-| `agent.epsilon_end` | 0.05 | Minimum exploration rate |
-| `agent.epsilon_decay_steps` | 100000 | Linear decay horizon |
-| `agent.buffer_capacity` | 100000 | Replay buffer size |
-| `agent.batch_size` | 64 | Mini-batch size |
-| `agent.target_update_freq` | 1000 | Target network sync interval |
+| Parameter | DQN | Dueling DQN | Description |
+|---|---|---|---|
+| `seed` | 42 | 42 | Global random seed |
+| `device` | auto | auto | Compute device: auto / cpu / cuda / mps |
+| `num_episodes` | 5000 | 5000 | Training episode count |
+| `gamma` | 0.99 | 0.99 | Discount factor |
+| `learning_rate` | 0.0001 | 0.0001 | Adam LR |
+| `epsilon_start` | 1.0 | 1.0 | Initial exploration rate |
+| `epsilon_end` | 0.05 | 0.05 | Minimum exploration rate |
+| `epsilon_decay_steps` | 100000 | 100000 | Linear decay horizon |
+| `buffer_capacity` | 100000 | 100000 | Replay buffer size |
+| `batch_size` | 64 | 64 | Mini-batch size |
+| `target_update_freq` | 1000 | 1000 | Target network sync interval |
+| `hidden_sizes` | [512, 256, 128] | [512, 256] | Hidden layer widths |
+| `value_hidden` | — | 128 | Value stream hidden width |
+| `advantage_hidden` | — | 128 | Advantage stream hidden width |
 
 ---
 
@@ -138,30 +159,57 @@ All settings live in `config.yaml`.  Key parameters:
 
 ---
 
-## Algorithm: DQN (Baseline)
+## Algorithms
 
-- **Online network**: MLP 220 → 512 → 256 → 128 → 6
-- **Target network**: same architecture, weights copied every 1 000 gradient steps
+### DQN (Base Algorithm)
+
+- **Network**: MLP 220 → 512 → 256 → 128 → 6
+- **Target network**: same architecture, weights hard-copied every 1000 gradient steps
 - **Loss**: MSE between online Q-values and Bellman targets
-- **Exploration**: ε-greedy with linear decay (1.0 → 0.05 over 100 000 steps)
-- **Buffer**: uniform experience replay, capacity 100 000
+- **Exploration**: ε-greedy with linear decay (1.0 → 0.05 over 100k steps)
+- **Buffer**: uniform experience replay, capacity 100k
 
-**Phase 3 advanced algorithm: Dueling DQN**
-The Q-network will be replaced with a dueling architecture that splits the
-final layers into a Value stream V(s) and an Advantage stream A(s,a),
-combined as Q(s,a) = V(s) + A(s,a) − mean(A).  All other components
-(buffer, exploration, target network) remain identical to isolate the
-architectural benefit.
+### Dueling DQN (Advanced Algorithm)
+
+- **Shared layers**: 220 → 512 → 256
+- **Value stream**: 256 → 128 → 1 (state value V(s))
+- **Advantage stream**: 256 → 128 → 6 (per-action advantage A(s,a))
+- **Aggregation**: Q(s,a) = V(s) + A(s,a) − mean(A)
+- All other components (buffer, exploration, target network, optimizer) are
+  identical to the vanilla DQN for a fair controlled comparison.
+
+**Theoretical motivation:** The dueling architecture separates state-value
+estimation from action-advantage estimation.  In Tetris, many board states
+have similar value regardless of the action chosen (e.g., when the board is
+nearly empty).  Dueling DQN can generalise V(s) across actions without
+needing to observe every (s, a) pair, improving sample efficiency.
 
 ---
 
-## Evaluation Metrics (Phase 1 §Evaluation Metric)
+## Comparative Analysis (Phase 3, Task 3)
+
+After training both agents, run `python compare.py` to generate:
+
+| Plot | File | Metric |
+|---|---|---|
+| Learning speed | `comparison_learning_speed.png` | Overlaid reward curves with threshold marker |
+| Loss convergence | `comparison_loss_convergence.png` | Overlaid smoothed loss curves |
+| Final performance | `comparison_final_performance.png` | Bar chart: mean ± std (last 100 eps) |
+| Stability | `comparison_stability.png` | Reward curves with ±1σ shaded region |
+| Epsilon schedule | `comparison_epsilon.png` | Exploration decay verification |
+
+---
+
+## Evaluation Metrics
 
 | Metric | Tracking | Rolling window |
 |---|---|---|
-| Episode score (primary) | per episode | 100 episodes |
-| Lines cleared (secondary) | per episode | 100 episodes |
-| Survival steps (tertiary) | per episode | 100 episodes |
+| Episode reward (primary) | per episode | 100 episodes |
+| In-game score | per episode | 100 episodes |
+| Lines cleared | per episode | 100 episodes |
+| Survival steps | per episode | 100 episodes |
+| MSE loss | per episode | 100 episodes |
+| Epsilon | per episode | — |
 
 Convergence is defined as the 100-episode rolling score stabilising within
 ±5 % over 500 consecutive episodes.
